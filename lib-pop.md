@@ -198,7 +198,7 @@ typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation
 
 # 其他
 
-## 生成一个临时的唯一表示符
+## NSUUID 生成一个临时的唯一表示符
 
 在添加一个动画的时候，如果key为nil，内部会为其自动生成一个唯一标识符。
 
@@ -211,7 +211,7 @@ CADisplayLink是一个能让我们以和屏幕刷新率相同的频率将内容�
 
 iOS设备的屏幕刷新频率是固定的，CADisplayLink在正常情况下会在每次刷新结束都被调用，精确度相当高。所以在自定义动画，或视频播放的渲染用 CADisplayLink 比较合适。反观 NSTimer, 可能因为 runloop 而导致精确度低。
 
-## OSSpinLock
+## OSSpinLock 自旋锁
 在 POPAnimator 内部使用 OSSpinLock 的锁来管理内部的动画列表的。称为自旋锁，是 ios 上目前效率最高的锁，主要是因为其实现并没有进入系统内核层，可以节省系统调用和上下文切换。所以在一些开源项目中用得比较多。另外 synchronized 和 NSConditionLock 是性能最差的锁。可以参看 http://www.2cto.com/kf/201505/400344.html
 
 ```c
