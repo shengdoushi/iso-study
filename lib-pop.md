@@ -25,7 +25,7 @@
 
 一切动画皆  POPAnimation, 提供了动画的操作界面，动画引擎内部都是用的这个操作界面操作动画（几个内部具体实现中可能会根据不同的动画具体类进行操作）。
 
-然后 POPPropertyAnimation 是一个具有属性的 POPAnimation, 所以这个才具有实用价值，pop 提供给用户的四种动画(POPSpringAnimation, POPDecayAnimation, POPBasicAnimation 和 POPCustomAnimation)都是一个特殊的 POPPropertyAnimation，只是描述了某个具体曲线的动画。
+然后 POPPropertyAnimation 是一个具有属性的 POPAnimation, 所以这个才具有实用价值，pop 提供给用户的四种动画(POPSpringAnimation, POPDecayAnimation, POPBasicAnimation)都是一个特殊的 POPPropertyAnimation，只是描述了某个具体曲线的动画。另外 POPCustomAnimation 是直接继承 POPAnimation 的。
 
 每个 POPAnimation 内部有一个 _POPAnimationState 的 state, 这个属性是动画的内部状态机。每个具体的动画可能内部的状态机不同，有 _POPPropertyAnimationState, _POPBasicAnimationState, _POPSpringAnimationState, _POPDecayAnimationState 等。 事实上，所有动画相关的变化，大部分在 state 内完成。描述了开始，结束，以及每个时间帧的接口和实现。
 
@@ -49,6 +49,78 @@
 ```
 
 内部的添加动画，移除动画等动画的管理，都是交由 POPAnimator 这个单例。这个才是 pop 的核心机器。NSObject 的类别方法，实际上是 POPAnimator 的一个面向库使用者的界面。
+
+# 基本动画 POPBasicAnimation
+
+基本动画给定了动画的时长和时间变化函数。
+
+```objective-c
+    @interface POPBasicAnimation : POPPropertyAnimation
+	+ (instancetype)animationWithPropertyNamed:(NSString *)name;
+    @property (assign, nonatomic) CFTimeInterval duration;
+    @property (strong, nonatomic) CAMediaTimingFunction *timingFunction; 动画曲线
+    @end
+```
+
+其 state （_POPBasicAnimationState） 是继承自 _POPPropertyAnimationState 的， 所以可以指定 property 属性。
+
+timingFunction 为描述变化bezier曲线的，内部是使用 WebCore::UnitBezier 来计算。
+
+# 自定义动画 POPCustomAnimation
+
+自定义动画并没有指定动画时长，是通过自定义的事件帧函数的返回值来确定动画结束的。
+
+```objective-c
+    typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation);
+    @interface POPCustomAnimation : POPAnimation
+    + (instancetype)animationWithBlock:(POPCustomAnimationBlock)block;
+    @property (readonly, nonatomic) CFTimeInterval currentTime;
+    @property (readonly, nonatomic) CFTimeInterval elapsedTime;
+    @end
+```
+
+提供的 block 在每个时间帧都会回调，在其内部定义好每个时间点的动作即可。
+
+# 弹簧动画 POPSpringAnimation
+
+弹簧动画给定变化属性，自动结束动画。
+
+```objective-c
+    @interface POPSpringAnimation : POPPropertyAnimation
+    + (instancetype)animation;
+    + (instancetype)animationWithPropertyNamed:(NSString *)name;
+    
+    @property (copy, nonatomic) id velocity;
+    @property (assign, nonatomic) CGFloat springBounciness;
+    @property (assign, nonatomic) CGFloat springSpeed;
+    @property (assign, nonatomic) CGFloat dynamicsTension;
+    @property (assign, nonatomic) CGFloat dynamicsFriction;
+    @property (assign, nonatomic) CGFloat dynamicsMass;
+    @end
+```
+
+## 衰减动画 POPDecayAnimation
+
+衰减动画给定变化属性，自动结束动画。
+
+```objective-c
+    @interface POPDecayAnimation : POPPropertyAnimation
+    + (instancetype)animation;
+    + (instancetype)animationWithPropertyNamed:(NSString *)name;
+    
+    @property (copy, nonatomic) id velocity;
+    @property (copy, nonatomic, readonly) id originalVelocity;
+    @property (assign, nonatomic) CGFloat deceleration;
+    @property (readonly, assign, nonatomic) CFTimeInterval duration;
+    
+    - (void)setToValue:(id)toValue NS_UNAVAILABLE;
+    - (id)reversedVelocity;
+    @end
+
+```
+
+# WebCore
+内置了 WebCore 的几种算法，都放在 WebCore 文件夹下了。包括 UnitBezier, FloatConversion, TransformationMatrix 三个算法。
 
 # 时间帧
 在一个事件侦内，使用 [CATrasaction begin] 和 [CATrasaction commit] 来包裹的。但是设置 [CATransaction setDisableActions:YES], 因为没帧内，不需要做 core animation 动画。
@@ -81,7 +153,7 @@ iOS设备的屏幕刷新频率是固定的，CADisplayLink在正常情况下会�
 ```
 
 
-# __VA_ARGS__ 用于宏之间传递可变参数
+## __VA_ARGS__ 用于宏之间传递可变参数
 
 ```c
     #define FB_PROPERTY_SET(stype, property, mutator, ctype, ...) \
@@ -101,4 +173,36 @@ iOS设备的屏幕刷新频率是固定的，CADisplayLink在正常情况下会�
 ```
 
 
-	
+## 贝塞尔曲线
+
+根据四个位置任意的点坐标绘制出的一条光滑曲线。由法国数学家Pierre Bézier发明，并给出了计算公式。可以扩展到多个控制点。
+
+特别的，当只提供两个点：起点和终点的时候，是一个直线。
+
+
+## CAMediaTimingFunction
+
+描述时间曲线，函数将在区间 [0, 1] 的时间映射到另一个 [0,1] 区间内的一个时间。
+
+时间的 bezier 曲线是从 (0,0) 到 (1,1) 点，中间有两个控制点。控制点是自定义的。
+
+内置的几种时间函数:
+
+- Linear  控制点： (0,0), (1,1)
+- EaseIn 控制点:  (0.42,0), (1,1)
+- EaseOut 控制点：(0,0), (0.58,1.0)
+- EaseInEaseOut 控制点：(0.42,0), (0.58,1)
+- Default 控制点：(0.25,0.1) and (0.25,1)
+
+```objective-c
+    // 这种语法是合法的。 贝塞尔曲线自动调整为从 (0, 0) 到 (1, 1), 之间的两个控制点为 (c1x, c1y), (c2x, c2y)
+    - (id)initWithControlPoints:(float)c1x
+                               :(float)c1y
+                               :(float)c2x
+                               :(float)c2y;
+							   
+	// 获取控制点, index取值0~3
+	- (void)getControlPointAtIndex:(size_t)index
+	                        values:(float [2])ptr							   
+```
+
