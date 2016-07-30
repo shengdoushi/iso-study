@@ -127,6 +127,75 @@ typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation
 
 每一帧内对动画对象进行更新。通过调用 POPAnimation 内的 state 来具体更新。
 
+```objective-c
+- (void)_renderTime:(CFTimeInterval)time item:(POPAnimatorItemRef)item
+{
+  id obj = item->object;
+  POPAnimation *anim = item->animation;
+  POPAnimationState *state = POPAnimationGetState(anim);
+
+  if (nil == obj) {
+    // 没有 object ， 则清理掉并返回
+    NSAssert(item->unretainedObject, @"object should exist");
+    stopAndCleanup(self, item, true, false);
+  } else {
+
+    // 启动动画（如果需要的话）
+    state->startIfNeeded(obj, time, _slowMotionAccumulator);
+
+    // 暂停的动画不播放
+    if (state->active && !state->paused) {
+      // object exists; animate
+      applyAnimationTime(obj, state, time);
+
+      FBLogAnimDebug(@"time:%f running:%@", time, item->animation);
+      if (state->isDone()) {
+        // set end value
+        applyAnimationToValue(obj, state);
+
+        state->repeatCount--;
+        if (state->repeatForever || state->repeatCount > 0) {
+          if ([anim isKindOfClass:[POPPropertyAnimation class]]) {
+            POPPropertyAnimation *propAnim = (POPPropertyAnimation *)anim;
+            id oldFromValue = propAnim.fromValue;
+            propAnim.fromValue = propAnim.toValue;
+
+            if (state->autoreverses) {
+              if (state->tracing) {
+                [state->tracer autoreversed];
+              }
+
+              if (state->type == kPOPAnimationDecay) {
+                POPDecayAnimation *decayAnimation = (POPDecayAnimation *)propAnim;
+                decayAnimation.velocity = [decayAnimation reversedVelocity];
+              } else {
+                propAnim.toValue = oldFromValue;
+              }
+            } else {
+              if (state->type == kPOPAnimationDecay) {
+                POPDecayAnimation *decayAnimation = (POPDecayAnimation *)propAnim;
+                id originalVelocity = decayAnimation.originalVelocity;
+                decayAnimation.velocity = originalVelocity;
+              } else {
+                propAnim.fromValue = oldFromValue;
+              }
+            }
+          }
+
+          state->stop(NO, NO);
+          state->reset(true);
+
+          state->startIfNeeded(obj, time, _slowMotionAccumulator);
+        } else {
+          stopAndCleanup(self, item, state->removedOnCompletion, YES);
+        }
+      }
+    }
+  }
+}
+
+```
+
 # 其他
 
 ## 生成一个临时的唯一表示符
@@ -208,3 +277,24 @@ DEFINE_RW_PROPERTY_OBJ(POPPropertyAnimationState, property, setProperty:, POPAni
                         values:(float [2])ptr							   
 ```
 
+## CACurrentMediaTime() 获取当前时间
+
+函数原型：
+
+```c
+CFTimeInterval CACurrentMediaTime ( void );
+```
+
+内部调用 mach_absolute_time()  获取当前时间转换为秒并返回。
+
+mach_absolute_time 是一个CPU/总线依赖函数，返回一个基于系统启动后的时钟”嘀嗒”数(int64),属于高精度的纳秒级别。
+模拟下函数实现:
+
+```c
+CFTimeInterval CACurrentMediaTime(){
+	int64_t time = mach_absolute_time();
+    mach_timebase_info_data_t timebase;
+    mach_timebase_info(&timebase);
+    return (CFTimeInterval)time * (double)timebase.numer / (double)timebase.denom /1e9;
+}
+```
