@@ -81,4 +81,24 @@ iOS设备的屏幕刷新频率是固定的，CADisplayLink在正常情况下会�
 ```
 
 
+# __VA_ARGS__ 用于宏之间传递可变参数
 
+```c
+    #define FB_PROPERTY_SET(stype, property, mutator, ctype, ...) \
+    - (void)mutator (ctype)value { \
+      if (value == ((stype *)_state)->property) \
+        return; \
+      ((stype *)_state)->property = value; \
+      __VA_ARGS__ \
+    }
+    
+    #define DEFINE_RW_PROPERTY(stype, flag, mutator, ctype, ...) \
+      FB_PROPERTY_GET (stype, flag, ctype) \
+      FB_PROPERTY_SET (stype, flag, mutator, ctype, __VA_ARGS__)
+    
+    // 用法
+    DEFINE_RW_PROPERTY_OBJ(POPPropertyAnimationState, property, setProperty:, POPAnimatableProperty*, ((POPPropertyAnimationState
+```
+
+
+	
