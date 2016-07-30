@@ -55,11 +55,11 @@
 基本动画给定了动画的时长和时间变化函数。
 
 ```objective-c
-    @interface POPBasicAnimation : POPPropertyAnimation
-	+ (instancetype)animationWithPropertyNamed:(NSString *)name;
-    @property (assign, nonatomic) CFTimeInterval duration;
-    @property (strong, nonatomic) CAMediaTimingFunction *timingFunction; 动画曲线
-    @end
+@interface POPBasicAnimation : POPPropertyAnimation
++ (instancetype)animationWithPropertyNamed:(NSString *)name;
+@property (assign, nonatomic) CFTimeInterval duration;
+@property (strong, nonatomic) CAMediaTimingFunction *timingFunction; 动画曲线
+@end
 ```
 
 其 state （_POPBasicAnimationState） 是继承自 _POPPropertyAnimationState 的， 所以可以指定 property 属性。
@@ -71,12 +71,12 @@ timingFunction 为描述变化bezier曲线的，内部是使用 WebCore::UnitBez
 自定义动画并没有指定动画时长，是通过自定义的事件帧函数的返回值来确定动画结束的。
 
 ```objective-c
-    typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation);
-    @interface POPCustomAnimation : POPAnimation
-    + (instancetype)animationWithBlock:(POPCustomAnimationBlock)block;
-    @property (readonly, nonatomic) CFTimeInterval currentTime;
-    @property (readonly, nonatomic) CFTimeInterval elapsedTime;
-    @end
+typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation);
+@interface POPCustomAnimation : POPAnimation
++ (instancetype)animationWithBlock:(POPCustomAnimationBlock)block;
+@property (readonly, nonatomic) CFTimeInterval currentTime;
+@property (readonly, nonatomic) CFTimeInterval elapsedTime;
+@end
 ```
 
 提供的 block 在每个时间帧都会回调，在其内部定义好每个时间点的动作即可。
@@ -86,17 +86,17 @@ timingFunction 为描述变化bezier曲线的，内部是使用 WebCore::UnitBez
 弹簧动画给定变化属性，自动结束动画。
 
 ```objective-c
-    @interface POPSpringAnimation : POPPropertyAnimation
-    + (instancetype)animation;
-    + (instancetype)animationWithPropertyNamed:(NSString *)name;
-    
-    @property (copy, nonatomic) id velocity;
-    @property (assign, nonatomic) CGFloat springBounciness;
-    @property (assign, nonatomic) CGFloat springSpeed;
-    @property (assign, nonatomic) CGFloat dynamicsTension;
-    @property (assign, nonatomic) CGFloat dynamicsFriction;
-    @property (assign, nonatomic) CGFloat dynamicsMass;
-    @end
+@interface POPSpringAnimation : POPPropertyAnimation
++ (instancetype)animation;
++ (instancetype)animationWithPropertyNamed:(NSString *)name;
+
+@property (copy, nonatomic) id velocity;
+@property (assign, nonatomic) CGFloat springBounciness;
+@property (assign, nonatomic) CGFloat springSpeed;
+@property (assign, nonatomic) CGFloat dynamicsTension;
+@property (assign, nonatomic) CGFloat dynamicsFriction;
+@property (assign, nonatomic) CGFloat dynamicsMass;
+@end
 ```
 
 ## 衰减动画 POPDecayAnimation
@@ -104,18 +104,18 @@ timingFunction 为描述变化bezier曲线的，内部是使用 WebCore::UnitBez
 衰减动画给定变化属性，自动结束动画。
 
 ```objective-c
-    @interface POPDecayAnimation : POPPropertyAnimation
-    + (instancetype)animation;
-    + (instancetype)animationWithPropertyNamed:(NSString *)name;
-    
-    @property (copy, nonatomic) id velocity;
-    @property (copy, nonatomic, readonly) id originalVelocity;
-    @property (assign, nonatomic) CGFloat deceleration;
-    @property (readonly, assign, nonatomic) CFTimeInterval duration;
-    
-    - (void)setToValue:(id)toValue NS_UNAVAILABLE;
-    - (id)reversedVelocity;
-    @end
+@interface POPDecayAnimation : POPPropertyAnimation
++ (instancetype)animation;
++ (instancetype)animationWithPropertyNamed:(NSString *)name;
+
+@property (copy, nonatomic) id velocity;
+@property (copy, nonatomic, readonly) id originalVelocity;
+@property (assign, nonatomic) CGFloat deceleration;
+@property (readonly, assign, nonatomic) CFTimeInterval duration;
+
+- (void)setToValue:(id)toValue NS_UNAVAILABLE;
+- (id)reversedVelocity;
+@end
 
 ```
 
@@ -146,30 +146,30 @@ iOS设备的屏幕刷新频率是固定的，CADisplayLink在正常情况下会�
 在 POPAnimator 内部使用 OSSpinLock 的锁来管理内部的动画列表的。称为自旋锁，是 ios 上目前效率最高的锁，主要是因为其实现并没有进入系统内核层，可以节省系统调用和上下文切换。所以在一些开源项目中用得比较多。另外 synchronized 和 NSConditionLock 是性能最差的锁。可以参看 http://www.2cto.com/kf/201505/400344.html
 
 ```c
-	OSSpinLock _lock = OS_SPINLOCK_INIT;
-	OSSpinLockLock(&_lock);
-	// 锁区操作
-	OSSpinLockUnlock(&_lock);
+OSSpinLock _lock = OS_SPINLOCK_INIT;
+OSSpinLockLock(&_lock);
+// 锁区操作
+OSSpinLockUnlock(&_lock);
 ```
 
 
 ## __VA_ARGS__ 用于宏之间传递可变参数
 
 ```c
-    #define FB_PROPERTY_SET(stype, property, mutator, ctype, ...) \
-    - (void)mutator (ctype)value { \
-      if (value == ((stype *)_state)->property) \
-        return; \
-      ((stype *)_state)->property = value; \
-      __VA_ARGS__ \
-    }
-    
-    #define DEFINE_RW_PROPERTY(stype, flag, mutator, ctype, ...) \
-      FB_PROPERTY_GET (stype, flag, ctype) \
-      FB_PROPERTY_SET (stype, flag, mutator, ctype, __VA_ARGS__)
-    
-    // 用法
-    DEFINE_RW_PROPERTY_OBJ(POPPropertyAnimationState, property, setProperty:, POPAnimatableProperty*, ((POPPropertyAnimationState
+#define FB_PROPERTY_SET(stype, property, mutator, ctype, ...) \
+- (void)mutator (ctype)value { \
+  if (value == ((stype *)_state)->property) \
+    return; \
+  ((stype *)_state)->property = value; \
+  __VA_ARGS__ \
+}
+
+#define DEFINE_RW_PROPERTY(stype, flag, mutator, ctype, ...) \
+  FB_PROPERTY_GET (stype, flag, ctype) \
+  FB_PROPERTY_SET (stype, flag, mutator, ctype, __VA_ARGS__)
+
+// 用法
+DEFINE_RW_PROPERTY_OBJ(POPPropertyAnimationState, property, setProperty:, POPAnimatableProperty*, ((POPPropertyAnimationState
 ```
 
 
@@ -195,14 +195,16 @@ iOS设备的屏幕刷新频率是固定的，CADisplayLink在正常情况下会�
 - Default 控制点：(0.25,0.1) and (0.25,1)
 
 ```objective-c
-    // 这种语法是合法的。 贝塞尔曲线自动调整为从 (0, 0) 到 (1, 1), 之间的两个控制点为 (c1x, c1y), (c2x, c2y)
-    - (id)initWithControlPoints:(float)c1x
-                               :(float)c1y
-                               :(float)c2x
-                               :(float)c2y;
-							   
-	// 获取控制点, index取值0~3
-	- (void)getControlPointAtIndex:(size_t)index
-	                        values:(float [2])ptr							   
+// 内置的时间函数: kCAMediaTimingFunctionLinear 等
++ (instancetype)functionWithName:(NSString *)name
+// 这种语法是合法的。 贝塞尔曲线自动调整为从 (0, 0) 到 (1, 1), 之间的两个控制点为 (c1x, c1y), (c2x, c2y)
+- (id)initWithControlPoints:(float)c1x
+                           :(float)c1y
+                           :(float)c2x
+                           :(float)c2y;
+						   
+// 获取控制点, index取值0~3
+- (void)getControlPointAtIndex:(size_t)index
+                        values:(float [2])ptr							   
 ```
 
