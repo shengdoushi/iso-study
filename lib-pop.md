@@ -57,13 +57,14 @@
 ```objective-c
 @interface POPBasicAnimation : POPPropertyAnimation
 + (instancetype)animationWithPropertyNamed:(NSString *)name;
-@property (assign, nonatomic) CFTimeInterval duration;
-@property (strong, nonatomic) CAMediaTimingFunction *timingFunction; 动画曲线
+@property (assign, nonatomic) CFTimeInterval duration; // 动画时长
+@property (strong, nonatomic) CAMediaTimingFunction *timingFunction; // 动画曲线
 @end
 ```
 
 其 state （_POPBasicAnimationState） 是继承自 _POPPropertyAnimationState 的， 所以可以指定 property 属性。
 
+基本动画需要设置两个属性 duration 和 timingFunction。
 timingFunction 为描述变化bezier曲线的，内部是使用 WebCore::UnitBezier 来计算。
 
 # 自定义动画 POPCustomAnimation
@@ -74,12 +75,12 @@ timingFunction 为描述变化bezier曲线的，内部是使用 WebCore::UnitBez
 typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation);
 @interface POPCustomAnimation : POPAnimation
 + (instancetype)animationWithBlock:(POPCustomAnimationBlock)block;
-@property (readonly, nonatomic) CFTimeInterval currentTime;
-@property (readonly, nonatomic) CFTimeInterval elapsedTime;
+@property (readonly, nonatomic) CFTimeInterval currentTime; // 当前回调的时间
+@property (readonly, nonatomic) CFTimeInterval elapsedTime; // 从上次回调到当前回调的时间间隔
 @end
 ```
 
-提供的 block 在每个时间帧都会回调，在其内部定义好每个时间点的动作即可。
+自定义动画只需要设置一个 block 回调参数。提供的 block 在每个时间帧都会回调，在其内部定义好每个时间点的动作即可。
 
 # 弹簧动画 POPSpringAnimation
 
@@ -90,14 +91,48 @@ typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation
 + (instancetype)animation;
 + (instancetype)animationWithPropertyNamed:(NSString *)name;
 
-@property (copy, nonatomic) id velocity;
+@property (copy, nonatomic) id velocity; // 当前速度，在动画开始前设置
+/**
+有效的反弹振幅
+[0,20] 默认: 4， 值越大，会导致弹簧振幅的范围变大，弹性效果越明显。
+与 springSpeed 结合使用，
+*/
 @property (assign, nonatomic) CGFloat springBounciness;
-@property (assign, nonatomic) CGFloat springSpeed;
-@property (assign, nonatomic) CGFloat dynamicsTension;
-@property (assign, nonatomic) CGFloat dynamicsFriction;
-@property (assign, nonatomic) CGFloat dynamicsMass;
+/**
+有效的速度
+[0,20], 默认: 12, 值越大，对弹簧的抑制效果越明显，导致初始速度变大，动画结束的也越快
+与 springBounciness
+*/
+@property (assign, nonatomic) CGFloat springSpeed; // 速度
+
+// 下边三个主要在动力学模拟中用到
+@property (assign, nonatomic) CGFloat dynamicsTension; // 张力
+@property (assign, nonatomic) CGFloat dynamicsFriction; // 摩擦
+@property (assign, nonatomic) CGFloat dynamicsMass; // 质量
 @end
 ```
+
+velocity 是一个计算型变量，返回的是 POPBox(__state->velocityVec, __state->valueType), 设置的时候直接影响 __state 内的 velocityVec 和 originalVelocityVec 变量，所以设置的话，需要在动画开始前设置，否则会影响动画内部状态。
+
+spring 动画一般主要设置三个属性：velocity, springBounciness 和 springSpeed。
+
+关于动力学模拟，这里主要是最后三个属性 dynamicsTension, dynamicsFriction, 和 dynamicsMass, 一旦设置了任一一个，都会开启动力学模拟。这些参数和 springSpeed, springBounciness 属性是互斥的。当设置了 springBounciness， springSpeed 任一一个，都会关闭动力学模拟。
+
+尽管上边两组参数是互斥的， 但是当关闭动力学模拟时候，内部实现中会转换为动力学模拟的三个参数: 张力，摩擦和质量。因为最底层的 POP::SpringSolver 内部spring计算中还是使用的动力学模拟的三个参数作为参数，来计算spring动画的。
+
+另外， UIKit 内 UIView 上有个 spring 动画的方法（iOS 7+):
+
+```objective-c
++ (void)animateWithDuration:(NSTimeInterval)duration
+                      delay:(NSTimeInterval)delay
+     usingSpringWithDamping:(CGFloat)dampingRatio
+      initialSpringVelocity:(CGFloat)velocity
+                    options:(UIViewAnimationOptions)options
+                 animations:(void (^)(void))animations
+                 completion:(void (^)(BOOL finished))completion
+```
+
+只提供了 dampingRatio 和 velocity 两个属性可调。 dampingRatio 影响动画在最后的振幅，成为阻尼系数，[0,1], 值越大，阻力越大，则振幅越小。 velocity 代表初始速度，[0,1] 是一个速度的百分比，比如动画的总移动距离是200 pt， 你希望速度是 100pt/s, 那么 velocity 就设置为 0.5，另一方面， velocity 因为是一个百分比，所以间接的就影响了动画的时长，如 0.5 下，动画时长就是 2s。
 
 ## 衰减动画 POPDecayAnimation
 
@@ -108,16 +143,31 @@ typedef BOOL (^POPCustomAnimationBlock)(id target, POPCustomAnimation *animation
 + (instancetype)animation;
 + (instancetype)animationWithPropertyNamed:(NSString *)name;
 
+/**
+速度，动画开始前设置。同 POPSpringAnimation 中的 velocity
+*/
 @property (copy, nonatomic) id velocity;
+/**
+readonly 变量
+本次动画开始速度，因为动画可能 翻转，或重播。
+*/
 @property (copy, nonatomic, readonly) id originalVelocity;
+/**
+[0,1] 默认： 0.998 值越小，表示更快的减速
+*/
 @property (assign, nonatomic) CGFloat deceleration;
+/**
+readonly 变量
+动画的期望时长
+*/
 @property (readonly, assign, nonatomic) CFTimeInterval duration;
 
-- (void)setToValue:(id)toValue NS_UNAVAILABLE;
 - (id)reversedVelocity;
 @end
 
 ```
+
+可以看到 decay 动画主要设置两个属性: velocity, deceleration。
 
 # WebCore
 内置了 WebCore 的几种算法，都放在 WebCore 文件夹下了。包括 UnitBezier, FloatConversion, TransformationMatrix 三个算法。
@@ -297,4 +347,30 @@ CFTimeInterval CACurrentMediaTime(){
     mach_timebase_info(&timebase);
     return (CFTimeInterval)time * (double)timebase.numer / (double)timebase.denom /1e9;
 }
+```
+
+
+## NS_UNAVAILABLE  标记不可用
+
+标记一个方法不可用, 方法声明中放在尾部：
+
+```objective-c
+- (void)setToValue:(id)toValue NS_UNAVAILABLE;
+```
+
+可以在某些不允许调用某些方法的场景下使用，例如我们提供了一个带参数的init方法，但是又不允许使用者使用默认的init方法, 可以使用 NS_UNAVAILABLE 限定下, 将管理工作交给编译器:
+
+```
+@interface MyObject : NSObject
+-(instancetype)init NS_UNAVAILABLE;
+@end
+```
+
+类似的还有 NS_AUTOMATED_REFCOUNT_UNAVAILABLE 表示在 arc 选项下这些函数不可用:
+
+```
+- (id)retain NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
+- (oneway void)release NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
+- (id)autorelease NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
+- (NSUInteger)retainCount NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
 ```
