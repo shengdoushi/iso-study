@@ -12,10 +12,31 @@
 # 用法
 1. 构造一个动画，共有四种类型 spring, decay, basic, 和 custom。 分别对应实现类: POPSpringAnimation, POPDecayAnimation, POPBasicAnimation 和 POPCustomAnimation. 每种动画有自己的变量，无非就是设置动画的初始状态，和动画的结束状态，以及描述动画过程中变化曲线的属性。
 
+```objective-c
+POPSpringAnimation *anim = [POPSpringAnimation animation];
+```
+
 2. 启动动画，只要将动画添加到要执行的对象(NSObject)上: 通过 [object pop_addAnimation:anim forKey:@"key"]，之后可以通过 [object pop_animationForkey:@"key"] 来获取动画，更新内部的动画属性
+
+```objective-c
+[layer pop_addAnimation:anim forKey:@"myKey"];
+
+anim = [layer pop_animationForKey:@"myKey"];
+if (anim) {
+  /* update to value to new destination */
+  anim.toValue = @(42.0);
+} else {
+  /* create and start a new animation */
+  ....
+}
+```
 
 3. 停止动画，将动画从对象身上移除： [object pop_removeAnimationForKey:@"key"]
 
+
+```objective-c
+[layer pop_removeAnimationForKey:@"myKey"];
+```
 
 动画的属性通过 POPAnimatableProperty 来实现，每个动画内部都有此属性，用于描述 object 和动画如何进行数据沟通，即动画过程中的变化的值如何反应到object上，以及object上的值如何反应到动画的状态上。 pop 库内置了 UIKit 和 Cocoa 中大部分对象相关的动画属性，我们可以直接使用，如 kPOPLabelTextColor 就是一个对 UILabel 的文字颜色的动画属性。但是对没有内置的，我们需要自己去实现一个动画属性，这点上是保留了扩展性的，毕竟 pop 是对 NSObject 做动画的，而 NSObject 就是万物。
 
@@ -50,6 +71,50 @@
 
 内部的添加动画，移除动画等动画的管理，都是交由 POPAnimator 这个单例。这个才是 pop 的核心机器。NSObject 的类别方法，实际上是 POPAnimator 的一个面向库使用者的界面。
 
+# 属性动画 POPPropertyAnimation
+
+```objective-c
+@interface POPPropertyAnimation : POPAnimation
+@property (strong, nonatomic) POPAnimatableProperty *property; // 属性
+
+/**
+动画初始值， 如果未指定，则默认为 object 的当前属性值
+ */
+@property (copy, nonatomic) id fromValue;
+
+/**
+动画结束值， 如果未指定，则默认为 object 的当前属性值
+ */
+@property (copy, nonatomic) id toValue;
+
+/**
+动画的当前值的舍入因子。1.0 表示在整数值间舍入，0表示没有舍入。
+ */
+@property (assign, nonatomic) CGFloat roundingFactor;
+
+/**
+动画的当前值的约束模式。默认不约束(kPOPAnimationClampNone), 共有四种约束： 不约束，根据开始值约束，根据结束值约束，约束到开始值和结束值之间。
+*/
+@property (assign, nonatomic) NSUInteger clampMode;
+/**
+动画的值是否是添加到每一帧，还是设置到某一帧。默认是NO，即设置模式
+*/
+@property (assign, nonatomic, getter = isAdditive) BOOL additive;
+
+@end
+```
+
+property 动画，主要分为开始值 fromValue，结束值 toValue，以及对当前值的约束规则。以及 property 描述了动画的值和object 的值得对应关系。
+
+roundingFactor 是一个数值舍入因子。 可以认为是舍入到小数点后几位，如 10 表示舍入到小数点后1位。舍入流程是先对值和因子的乘积四舍五入，然后除以因子， 代码如下:
+
+```objective-c
+NS_INLINE CGFloat POPSubRound(CGFloat f, CGFloat sub/*舍入因子*/)
+{
+  return round(f * sub) / sub;
+}
+```
+	
 # 基本动画 POPBasicAnimation
 
 基本动画给定了动画的时长和时间变化函数。
