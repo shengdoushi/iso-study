@@ -57,6 +57,10 @@
 
 这个主要是为使用者方便使用，而添加的类别接口。内部转而调用 SDWebImageManager.sharedManager 进行图片下载。
 
+
+# SDWebImageDownloader 图片下载器
+
+
 # SDImageCache 图片缓存
 
 SDImageCache 提供了一个默认的缓存，用户也可以自定义。每个缓存有一个命名空间，默认的是 com.hackemist.SDWebImageCache.default，自定义的是 com.hackemist.SDWebImageCache.${name}。
