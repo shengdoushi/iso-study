@@ -60,6 +60,18 @@
 
 # SDWebImageDownloader 图片下载器
 
+```objective-c
+@interface SDWebImageDownloader
+
+@property (strong, nonatomic) NSOperationQueue *downloadQueue;
+@property (SDDispatchQueueSetterSementics, nonatomic) dispatch_queue_t barrierQueue;
+@property (strong, nonatomic) NSURLSession *session;
+@end
+```
+
+downloadQueue 队列中管理下载任务，默认的活动下载数量为6个任务。每个 NSOperation 为 SDWebImageDownloaderOperation 对象，下载内部使用 NSURLSession 创建的 dataTask 实现，这个session 就是 SDWebImageDownloader 中的 session。
+
+
 
 # SDImageCache 图片缓存
 
